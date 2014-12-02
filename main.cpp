@@ -10,6 +10,11 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <opencv2/opencv.hpp>
+#include <opencv2/core/core.hpp>
+#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/ml/ml.hpp>
 #include "procdigit.h"
 #include "neural.h"
 #include "sudoku.h"
@@ -17,7 +22,7 @@
 
 #define NEED_PROCESSING 0   // 画像のデータを処理するフラッグ
 #define NEED_TRAINING   0   // 画像のデータを学習するフラッグ
-#define IMAGE_MODE      1   // 画像を認識するモード。そうでなければカメラから認識を始める
+#define IMAGE_MODE      0   // 画像を認識するモード。そうでなければカメラから認識を始める
 
 using namespace std;
 
@@ -31,6 +36,12 @@ void recognize(cv::Mat org) {
     cv::Mat org_gray, dst;
     pre_process(org, org_gray);
     find_board(org, org_gray, dst);
+    /*
+    cv::namedWindow("sudoku-board");
+    cv::imshow("sudoku-board", dst);
+    cv::waitKey(0);
+    cv::destroyWindow("sudoku-board");
+    */
     int row = dst.rows, col = dst.cols;
     assert(row == SCALED_SIZE && col == SCALED_SIZE);
     int sub_size = SCALED_SIZE / 9;
@@ -39,9 +50,13 @@ void recognize(cv::Mat org) {
     
     cv::cvtColor(dst, dst_gray, CV_BGR2GRAY);
     cv::GaussianBlur(dst_gray, dst_gray, cv::Size(11, 11), 0);
+#if IMAGE_MODE
     cv::adaptiveThreshold(dst_gray, dst_gray, 255,
                           cv::ADAPTIVE_THRESH_GAUSSIAN_C, cv::THRESH_BINARY, 11, 2);
-    
+#else
+    cv::adaptiveThreshold(dst_gray, dst_gray, 255,
+                          cv::ADAPTIVE_THRESH_GAUSSIAN_C, cv::THRESH_BINARY, 7, 1);
+#endif
     // ボードを割り切り、各セルを処理する
     vector<vector<int> > board(9, vector<int>(9, 0));
     for (int i = 0; i < SCALED_SIZE; i += sub_size) {
@@ -146,7 +161,7 @@ void recognize(cv::Mat org) {
 int main(int argc, char * argv[]) {
     
 #if NEED_PROCESSING
-
+    
     // 学習データ用とテストデータを作成する
     fprintf(stdout, "画像を処理中\n");
     process_data(DATA_PATH, TRAINING_SAMPLES / NUM_CLASSES, (char *) "training_dataset.txt");
@@ -172,11 +187,11 @@ int main(int argc, char * argv[]) {
     
 #if IMAGE_MODE
     // 画像から認識する
-    char *img_filename = (argc > 1) ? argv[1] : (char *) "test1.jpg";
+    char *img_filename = (argc > 1) ? argv[1] : (char *) "test2.jpg";
     cv::Mat org;
     org = cv::imread(img_filename, 3);
     recognize(org);
-
+    
 #else
     // カメラから数独を認識する
     cv::VideoCapture cap;
